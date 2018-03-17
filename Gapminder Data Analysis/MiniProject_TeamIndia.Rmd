@@ -1,0 +1,229 @@
+---
+title: "Life Expectancy"
+author: "Apurva Gupta,Shailendra Patil,Surbhi Paithankar"
+# date: "2/11/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H')
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r eval=TRUE, echo=FALSE,inlude=FALSE,message=F, warning=F}
+library(gapminder)
+library(ggplot2)
+library(GGally)
+library(broom)
+library(gridExtra)
+library(dplyr)
+```
+##INTRODUCTION
+In this project, we want to know if the increase in life expectancy since world war 2 can be explained by increases in the GDP per capita.The basic intuition behind this question is the post war economy. The United States, Soviet Union, Western European and East Asian countries in particular experienced unusually high and sustained growth. The economy had rejuvenated after the great depression during the inter-war period. ThinkTank wants to analyze if this increase in GDP can be attributed to increase in life expectancy. For answering this, we analyse the different types of relationships with respect to time and continents.
+
+## Question 1: GDP and Life Expectancy in 2007
+```{r eval=TRUE, echo=FALSE}
+data = gapminder::gapminder
+continent = list((data$continent))
+year = list(data$year)
+```
+
+#### Let us analyze the data for 2007
+```{r eval=TRUE, echo=FALSE}
+data_2007 = subset(data,year == 2007)
+```
+Let us check the distribution for gdpPercap in 2007 before trying out the scatter plot
+```{r fig.width=5,fig.height=2,echo=FALSE}
+g1=ggplot(data_2007, aes(x = (gdpPercap))) + geom_density()+ggtitle("Density Plot")
+```
+```{r fig.width=5,fig.height=2,echo=FALSE}
+g1
+```
+
+From the above graph it is evident that the data is right skewed and hence we can apply log transformation on data.
+
+#### Now let us check the scatter plot for transformed data usin both default smoothing and linear smoothing
+```{r fig.width=8,fig.height=2,message=F,warning=F,echo=FALSE}
+ggplot_obj2 = ggplot(data = data_2007, aes(x = log(gdpPercap) , y = lifeExp))+geom_point() + 
+  geom_smooth(color="orange")+geom_smooth(method='lm')+ggtitle("Scatter Plot with loess and linear fit")
+ggplot_obj3 = ggplot(data = data_2007, aes(x = log(gdpPercap) , y = lifeExp))+geom_point() + 
+  geom_smooth(method='lm')+ggtitle("Scatter Plot with lm")
+
+data_2007_lm=lm(lifeExp ~ log(gdpPercap), data = data_2007)
+data_2007_lm_df=augment(data_2007_lm)
+g1=ggplot(data_2007_lm_df, aes(x = log.gdpPercap., y = .resid)) + geom_point() + geom_smooth()+geom_abline(slope = 0)
+grid.arrange(ggplot_obj2, g1, ncol=2)
+#grid.arrange(ggplot_obj2, ggplot_obj3, ncol=2)
+```
+
+The smooth curve almost looks like a linear relation, so we can say that there is a linear relation between the transformed gdpPercap and lifeExp in 2007. Most of the residuals are scattered around zero, with few exceptions being very large negative values. But those can be ignored considering the fact majority of points are scattered well around zero. And the horizontal line is within the confidence band as well. Hence in 2007 the linear fit is a good approximations, we can say the transformed log gdp has a near linear relation with life expectancy.
+```{r fig.width=5,fig.height=2,message=F,warning=F,echo=FALSE,eval=FALSE}
+data_2007_lm=lm(lifeExp ~ log(gdpPercap), data = data_2007)
+data_2007_lm_df=augment(data_2007_lm)
+ggplot(data_2007_lm_df, aes(x = log.gdpPercap., y = .resid)) + geom_point() + geom_smooth()+geom_abline(slope = 0)
+```
+
+### Checking the trend for different continents  
+
+#### Checking the summary statistic for continents
+```{r echo=FALSE}
+summary(data_2007$continent)
+```
+
+We can see that for 2007 Oceania has just 2 data points , hence we cannot find any relation between gdpPercap and lifeExp in 2007 for Ocenia, for this particular analysis we will ignore Ocenia.Remaining continents have a good amount of data for 2007, so we will check the trend for these continents.
+
+#### Let us check the gdpPercap distribution for each continent
+```{r fig.width=10,fig.height=2,echo=FALSE}
+data_2007_continent=subset(data_2007,continent!="Oceania")
+ggplot(data_2007_continent, aes(x = (gdpPercap))) + geom_density()+facet_grid(~continent)
+```
+
+For Africa, Americas, Asia the data is right skewed , hence we will log transform the data for just these continents
+
+```{r echo=FALSE}
+data_2007_continent_europe=subset(data_2007_continent,continent=="Europe")
+data_2007_continent_remaining=subset(data_2007_continent,continent!="Europe")
+```
+#### Checking scatter plots for Africa, Americas and Asia
+```{r warning=F,message=F,fig.width=10,fig.height=2.5,echo=FALSE}
+ggplot_obj_remaining = ggplot(data = data_2007_continent_remaining, aes(x = log(gdpPercap) , y = lifeExp)) 
+ggplot_obj_europe = ggplot(data = data_2007_continent_europe, aes(x = gdpPercap , y = lifeExp)) 
+
+ggplot_continent_remaining_loess<-ggplot_obj_remaining + geom_point() + geom_smooth(color="orange")+facet_grid(~continent)+ggtitle("Scatter Plot with loess and linear smoothing ")+geom_smooth(method='lm')
+ggplot_continent_remaining_linear<-ggplot_obj_remaining + geom_point() + geom_smooth(method='lm')+facet_grid(~continent)+ggtitle("Scatter Plot with linear smoothing ")
+
+grid.arrange(ggplot_continent_remaining_loess,ncol=1)
+# grid.arrange(ggplot_continent_remaining_loess,
+#              ggplot_continent_remaining_linear,ncol=1)
+
+```
+
+Here ignoring few points from Asia where there is a clutter between 8 and 9 and few points away from the linear fit We can say that  for Asia and America there is a linear relationship between transformed gdpPercap and lifeExp. And for Africa the relation is not exactly linear. But as we just want to know the trend and not predict values, we can assume it to be linear trend.
+For Africa, Americas and Asia, it looks like the linear trends have almost similar slope and hence we can say that it close to a additive shift
+
+#### Checking scatter plots for Europe
+```{r warning=F,message=F,fig.width=10,fig.height=2.5,echo=FALSE}
+ggplot_obj_europe_loess<-ggplot_obj_europe + geom_point() + geom_smooth(color="orange")+ggtitle("Scatter Plot with loess and linear smoothing ")+geom_smooth(method='lm')
+ggplot_obj_europe_linear<-ggplot_obj_europe + geom_point() + geom_smooth(method='lm')+ggtitle("Scatter Plot with linear smoothing ")
+#grid.arrange(ggplot_obj_europe_loess,ggplot_obj_europe_linear,ncol=1)
+grid.arrange(ggplot_obj_europe_loess,ncol=1)
+```  
+It looks like the "loess" is a better fit in the above graph.
+Loess is a form of local polynomial regression, meaning that at every xx-value, it fits a weighted polynomial model “locally”: data at nearby xx-values will be weighted heavily, while data at far away xx-value will be downweighted or not considered at all if they fall outside a “neighborhood.
+But for Europe it something complicated and its not a simple additive or multiplicative shift
+
+
+
+
+## Question 2: Life expectancy over time by continent:
+
+When analyzing average life expectancy for each continent , we need to perform the weighed averaging. This is because the population of countries in every continent varies significantly.
+
+```{r echo=FALSE, warning=FALSE,message=F,fig.width=6,fig.height=2}
+
+Avg_lifeExp = aggregate(x = data$lifeExp,by=list(year = data$year,continent = data$continent),FUN=weighted.mean)
+Avg_lifeExp = subset(Avg_lifeExp,continent!='Oceania')
+
+colnames(Avg_lifeExp)[3] <- "Life_Expectancy"
+gplot1 = ggplot(Avg_lifeExp,aes(year,Life_Expectancy,color = continent)) +geom_point()+ geom_smooth(method = 'lm') + ggtitle("Avg Life Exp vs time by Continent") 
+
+gplot2 = ggplot(Avg_lifeExp,aes(year,Life_Expectancy,color = continent)) +geom_point()+ geom_smooth() + ggtitle("Avg Life Exp vs time by Continent") 
+grid.arrange(gplot2, ncol=1)
+```
+
+From the above graph, we can observe that the life expectancy for all the continents looks to be increasing.In the period of mid 1950s to 1980s ,Asia and America looks to be catching up with the continent with higher life expectancy, Europe. On the other hand, the life expectancy of Africa increased till mid 1980s, however it converges after that.
+
+Now lets analyze the countries that contribute to the growth in life expectancy for Asia and Americas.
+
+```{r echo=FALSE,message=F,warning=F,fig.width=12,fig.height=8}
+asia_data = subset(data,continent=='Asia')
+america_data = subset(data,continent=='Americas')
+plot1 =ggplot(asia_data,aes(x=asia_data$year,y=asia_data$lifeExp)) +  geom_text(aes(label=asia_data$country,size = as.numeric(pop),alpha=0.3)) +
+  geom_smooth(aes(weight = as.numeric(pop)), method.args = list(degree = 2)) + ggtitle("Life Expectancy over time for Asia") + xlab("Year") + ylab("Life Expectancy")
+
+plot2 =ggplot(america_data,aes(x=america_data$year,y=america_data$lifeExp)) +  geom_text(aes(label=america_data$country,size = as.numeric(pop),alpha=0.1)) +
+  geom_smooth(aes(weight = as.numeric(pop)), method.args = list(degree = 2))+ggtitle("Life Expectancy over time for Americas") + xlab("Year") + ylab("Life Expectancy")
+grid.arrange(plot1,plot2, ncol=1) 
+```
+
+
+From the above graphs, we observe that China & India are countries that are significantly contributing to the increase in the life expectancy for Asia. Similarly US and Brazil are prime contributors for Americas. This is attributed to the fact that the population of these countries have been dramatically increasing over the years.
+
+
+### Fitting a Model
+Now lets try to see how a linear models fits the data compared to the default loess model.
+
+```{r echo=FALSE,message=F,warning=F,fig.width=8,fig.height=2}
+
+grid.arrange(gplot1,gplot2, ncol=2)
+```
+In the above graphs we observe that the linear model fits the data well for continents having steady upward trend. However for the continent like Africa and Asia where the growth gets slower after certain point is not captured well by the linear model. Hence loess model looks to convey the information better regarding the periods of change. 
+Additionally we can observe that rate of change in life expectancy for Africa has slowed down from mid 0f 1980's onwards.This is not explained in the given data as to why there is such a slow down and this can be attributed to external factors. Further investigation revealed, in the 1970s decade the true HIV/AIDS epidemic broke out in Africa. This might be one of the reasons for the slow change.
+
+##Question 3: Changes in relationship between GDP and life expectancy over time
+
+As we have seen before GDP is right skewed , hence for our analysis we will use log transformed value of GDP.
+
+###Relationship between GDP and life Expectancy
+
+```{r echo=FALSE,warning=FALSE,message=F,fig.width=8,fig.height=4}
+data1 = subset(data,continent!='Oceania')
+ggplot(data1, aes(x = log10(gdpPercap), y = lifeExp)) + geom_point(aes(size = pop)) + 
+  geom_smooth(aes(weight = as.numeric(pop)), method.args = list(degree = 1), se = FALSE,color= 'blue') +
+geom_smooth(aes(weight = as.numeric(pop), color = "orange"), se = FALSE)+
+  facet_wrap(~continent,nrow = 2) + ggtitle("Life Expectancy vs GDP") + xlab("GDP") + ylab("Life Expectancy")
+
+```
+
+From the above graph, we can observe that there is definitely a trend between GDP and Life expectancy. As GDP increases,life expectancy also increases.Blue line gives a better fit i.e. degree 1 loess fit is better than the default degree 2 fit.
+
+###Relationship between Life Expectancy and Time 
+
+```{r echo=FALSE,warning=FALSE,message=F,fig.width=8,fig.height=4}
+data1 = subset(data,continent!='Oceania')
+ggplot(data1, aes(x = year, y = lifeExp)) + geom_point(aes(size = pop)) + 
+  geom_smooth(aes(weight = as.numeric(pop)), method.args = list(degree = 1), se = FALSE,color= 'blue') +
+geom_smooth(aes(weight = as.numeric(pop), color = "orange"), se = FALSE)+
+  facet_wrap(~continent,nrow = 2) + ggtitle("Life Expectancy over Time per continent") + xlab("Time(in years)") + ylab("Life Expectancy")
+```
+
+We can observe a pattern in Life expectancy vs Time. Over the Time, Life expectancy increases gradually for all the continents.From 1980s onwards,the rate of increase in life expectancy for Africa is less than the rate of increase for other continents.
+
+Let us analyze the relationship between GDP and Life expectancy for different time frames.
+
+```{r echo=FALSE,warning=FALSE,message=F,fig.width=10,fig.height=3}
+ggplot(data1, aes(x = log(gdpPercap), y = lifeExp)) + geom_point(aes(size=pop)) + geom_smooth(aes(weight=pop),method.args = list(degree = 1)) + facet_grid(~cut_number(year, n = 6,dig.lab = 4)) + labs(title = "GDP VS Life Expectancy over Time")
+```
+
+From the above graph, we can see that for initial years(before 1980), Life expectancy increases rapidly. After 1980, the trend seems to slow down. 
+
+Let us analyze the relationship between Time and Life expectancy over different ranges of GDP.
+
+```{r echo=FALSE,warning=FALSE,message=F,fig.width=12,fig.height=3}
+ggplot(data1, aes(x = year, y = lifeExp)) + geom_point(aes(size=pop)) + geom_smooth(aes(weight=pop),method.args = list(degree = 1)) + facet_grid(~cut_number(gdpPercap, n = 6,dig.lab = 4)) + labs(title = "Time VS Life Expectancy over different ranges of GDP")
+```
+
+There seems to be an interesting trend here. For countries with lower GDPs', till 1980, Life expectancy increases rapidly.After that period, life expectancy decreases rapdily. As we progress towards the countries with higher GDP, trend seems to stabilize and time doesnot make a huge impact on Life Expectancy. Also, we can observe that there is no additive shift between different time frames and different GDP ranges.This indicates that fitting a model with interactions will be safer.
+
+###Fitting Model
+
+```{r echo=FALSE,warning=FALSE,message=F,fig.width=8,fig.height=4}
+model= loess( lifeExp ~ log10(gdpPercap)*year, weights = pop, degree = 1, data = data1,control=loess.control(surface="direct"))
+newdata1 = expand.grid(year = seq(1950, 2010, 10), gdpPercap = c(400,1000,2000,20000, 50000,100000))
+immigrants.pred1 = predict(model, newdata = newdata1)
+immigrants.pred1 = data.frame(newdata1, predicted_Life_Exp = as.vector(immigrants.pred1))
+g1=ggplot(immigrants.pred1, aes(x = log(gdpPercap), y = predicted_Life_Exp,group = year, color = factor(year))) + geom_line()
+g2=ggplot(immigrants.pred1, aes(x = year, y = predicted_Life_Exp,group = gdpPercap, color = factor(gdpPercap))) + geom_line()
+grid.arrange(g1,g2,ncol=2)
+```
+
+The first graph explains us that as GDP increases, life expectancy increases. But after a certain point of time, Time does not have any effect on Life expectancy. 
+The second graph tells us that for lower GDP countries, as time progresses, life expectancy seems to stagnate i.e. there is not much increase in life expectancy over the time. But, for higher GDP countries we observe a different trend. Life expectancy keeps on increasing over the time.
+
+##Conclusion
+From all the data analysis we can observe that there is a steady increase in the life expectancy over all the continents except Africa(post 1980).For countries with lower GDP,we observe that life expectancy doesn't increase beyond a certain time .But for higher GDP countries,such effect is not observed and the life expectancy increases over the time.
+
