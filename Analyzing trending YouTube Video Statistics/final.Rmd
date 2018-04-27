@@ -1,0 +1,357 @@
+---
+title: "Final Project"
+author: "Surbhi Paithankar, Shailendra Patil, Apurva Gupta"
+date: "April 26, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Objective
+
+YouTube (the world-famous video sharing website) maintains a list of the top trending videos on the platform. According to Variety magazine, “To determine the year’s top-trending videos, YouTube uses a combination of factors including measuring users interactions (number of views, countries, categories, comments and likes).
+In this project, we want to analyze the various factors that affect the popularity of videos and also study relationships between these youtube video parameters.
+
+###Motivation
+Predicting factors that could make a video popular can help advertisement companies for making investments for certain videos. It can also help bloggers in knowing the aspects in a video that could increase their views. We wish to mine the various interactions between parameter to provide an insight of how popularity of videos is affected by region or their category.
+
+
+###Data Set
+We have leveraged the data set available on Kaggle.com.The data was collected using you tube API. This dataset is a daily record of the top trending YouTube videos from Nov 2017 - April 2018.  
+Data is available for 6 countries: Canada, Germany, France, Great Britain, United States.
+The data is available in two formats i.e CSV & JSON files. JSON file contains data pertaining to video categories.
+No. of total data records: 130,712
+Below is the link for data set:
+https://www.kaggle.com/datasnaek/youtube-new/data
+
+Response Variable: Views- Number of views
+Possible Predictor: 
+Likes: Number of likes
+Dislikes: Number of Dislikes
+Comment_count : Number of Comments
+Publish Date: Date on which video was published.
+Trending Date: Dates on which a particular video was trending.
+Category : The category to which a video belongs. (15 Categories)
+Trending days: Number of days a video was trending (Derived column)
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+library("rjson")
+library(ggplot2)
+library(lubridate)
+library(hash)
+library(gridExtra)
+library(GGally)
+
+ca_data<-read.csv("CAvideos.csv",header= TRUE)
+de_data<-read.csv("DEvideos.csv",header= TRUE)
+fr_data<-read.csv("FRvideos.csv",header =TRUE)
+gb_data<-read.csv("GBvideos.csv",header =TRUE)
+us_data<-read.csv("USvideos.csv",header =TRUE)
+ca_data_json<-fromJSON(file="CA_category_id.json")
+de_data_json<-fromJSON(file="DE_category_id.json")
+fr_data_json<-fromJSON(file="FR_category_id.json")
+gb_data_json <- fromJSON(file = "GB_category_id.json")
+us_data_json <- fromJSON(file = "US_category_id.json")
+
+#CA
+h=hash()
+for (i in 1:length(ca_data_json$items)) {
+  h[[ca_data_json$items[[i]]$id]]<-ca_data_json$items[[i]]$snippet$title
+}
+CA_Category=data.frame('category_id'=keys(h),'category'=values(h))
+CA_Category[CA_Category$category_id==23,]['category_id']=34
+CA_Category<-lapply(CA_Category, as.character)
+CA_Category<-data.frame(lapply(CA_Category, as.factor))
+ca_data=merge(ca_data,CA_Category,by.x = "category_id",by.y = "category_id")
+ca_data$category<-as.factor(as.character(ca_data$category))
+
+#DE
+h=hash()
+for (i in 1:length(de_data_json$items)) {
+  h[[de_data_json$items[[i]]$id]]<-de_data_json$items[[i]]$snippet$title
+}
+DE_Category=data.frame('category_id'=keys(h),'category'=values(h))
+DE_Category[DE_Category$category_id==23,]['category_id']=34
+DE_Category<-lapply(DE_Category, as.character)
+DE_Category<-data.frame(lapply(DE_Category, as.factor))
+de_data=merge(de_data,DE_Category,by.x = "category_id",by.y = "category_id")
+de_data$category<-as.factor(as.character(de_data$category))
+
+#FR
+h=hash()
+for (i in 1:length(fr_data_json$items)) {
+  h[[fr_data_json$items[[i]]$id]]<-fr_data_json$items[[i]]$snippet$title
+}
+FR_Category=data.frame('category_id'=keys(h),'category'=values(h))
+FR_Category[FR_Category$category_id==23,]['category_id']=34
+FR_Category<-lapply(FR_Category, as.character)
+FR_Category<-data.frame(lapply(FR_Category, as.factor))
+fr_data=merge(fr_data,FR_Category,by.x = "category_id",by.y = "category_id")
+fr_data$category<-as.factor(as.character(fr_data$category))
+
+#GB
+h=hash()
+for (i in 1:length(gb_data_json$items)) {
+  h[[gb_data_json$items[[i]]$id]]<-gb_data_json$items[[i]]$snippet$title
+}
+GB_Category=data.frame('category_id'=keys(h),'category'=values(h))
+GB_Category[GB_Category$category_id==23,]['category_id']=34
+GB_Category<-lapply(GB_Category, as.character)
+GB_Category<-data.frame(lapply(GB_Category, as.factor))
+gb_data=merge(gb_data,GB_Category,by.x = "category_id",by.y = "category_id")
+gb_data$category<-as.factor(as.character(gb_data$category))
+
+#US
+h=hash()
+for (i in 1:length(us_data_json$items)) {
+  h[[us_data_json$items[[i]]$id]]<-us_data_json$items[[i]]$snippet$title
+}
+US_Category=data.frame('category_id'=keys(h),'category'=values(h))
+US_Category[US_Category$category_id==23,]['category_id']=34
+US_Category<-lapply(US_Category, as.character)
+US_Category<-data.frame(lapply(US_Category, as.factor))
+us_data=merge(us_data,US_Category,by.x = "category_id",by.y = "category_id")
+us_data$category<-as.factor(as.character(us_data$category))
+
+gb_data$country="GB"
+ca_data$country="CA"
+de_data$country='DE'
+fr_data$country="FR"
+us_data$country="US"
+
+you_tube_data<-rbind(ca_data,de_data,fr_data,gb_data,us_data)
+you_tube_data$country <- factor(you_tube_data$country)
+
+you_tube_data$comments_disabled = ifelse(you_tube_data$comments_disabled=='False',
+                                   0,1)
+you_tube_data$ratings_disabled = ifelse(you_tube_data$ratings_disabled=='False',
+                                  0,1)
+you_tube_data$video_error_or_removed = ifelse(you_tube_data$video_error_or_removed=='False',
+                                        0,1)
+```
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+you_tube_data= you_tube_data[-c(4,7,12,16)]
+#summary(you_tube_data)
+write.csv(x = you_tube_data,file = "you_tube_data.csv")
+```
+
+We observed zeros in likes,dislikes, comment_count columns. We dropped all such rows in our further analysis.
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+you_tube_data= you_tube_data[you_tube_data$likes!=0,]
+you_tube_data= you_tube_data[you_tube_data$dislikes!=0,]
+you_tube_data= you_tube_data[you_tube_data$comment_count!=0,]
+```
+
+We also considered number of days for which a video was trending in our analysis. Moreover, our data consists of videos from over 15 categories. We grouped them together into 3 broad categories.
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+you_tube_data$trending_date = ydm(you_tube_data$trending_date)
+you_tube_data$publish_time = gsub('T', " ", you_tube_data$publish_time)
+you_tube_data$publish_time = gsub('Z', "", you_tube_data$publish_time)
+you_tube_data$publish_time = strptime(you_tube_data$publish_time, "%Y-%m-%d %H:%M:%S.%OS")
+
+you_tube_data$trending_date = paste(you_tube_data$trending_date,"23:59:59",sep = " ")
+you_tube_data$trending_date = strptime(you_tube_data$trending_date, "%Y-%m-%d %H:%M:%S")
+you_tube_data['duration'] = difftime(you_tube_data$trending_date,you_tube_data$publish_time,tz = "EST",units = 'hours')
+you_tube_data$duration = round(as.numeric(you_tube_data$duration),1)
+
+#ggplot(you_tube_data, aes(x = log10(duration))) + geom_density() + facet_wrap(~country)
+
+library(dplyr)
+
+you_tube_data$publish_time<-as.POSIXct(you_tube_data$publish_time)
+you_tube_data$trending_date<-as.POSIXct(you_tube_data$trending_date)
+
+last_video_df <- you_tube_data %>% 
+  group_by(country, video_id) %>%
+  filter(duration == max(duration)) %>%
+  arrange(country,video_id,duration)
+
+first_video_df <- you_tube_data %>% 
+  group_by(country, video_id) %>%
+  filter(duration == min(duration)) %>%
+  arrange(country,video_id,duration)
+
+
+#Clubbing Categories
+first_video_df['categories'] = ifelse(first_video_df$category=='Music' | 
+                                       first_video_df$category=='Entertainment' |
+                                       first_video_df$category=='Film & Animation' |
+                                       first_video_df$category=='Sports'|
+                                       first_video_df$category=='Gaming'|
+                                       first_video_df$category=='Shows','Entertainment', 
+                                     ifelse(first_video_df$category=='Autos & Vehicles' |
+                                              first_video_df$category=='Pets & Animals'|
+                                              first_video_df$category=='Travel & Events'|
+                                              first_video_df$category=='People & Blogs'|
+                                              first_video_df$category=='Howto & Style','Lifestyle',
+                                            ifelse(first_video_df$category=='News & Politics' |
+                                                     first_video_df$category=='Education'|
+                                                     first_video_df$category=='Science & Technology'|
+                                                     first_video_df$category=='Nonprofits & Activism'
+                                                    ,'Knowledge & Current Affairs','NA')))
+
+first_video_df['days'] = first_video_df$duration/24
+first_video_df['log.views'] = log10(first_video_df$views)
+first_video_df['log.likes'] = log10(first_video_df$likes)
+first_video_df['log.dislikes'] = log10(first_video_df$dislikes)
+first_video_df['log.comment_count'] = log10(first_video_df$comment_count)
+
+first_video_df['trending_days'] = ((last_video_df$duration - first_video_df$duration))
+
+videos_data = first_video_df
+first_video_df['trending_days'][first_video_df['trending_days']==0] = 1
+first_video_df['log.trending_days'] = log10(first_video_df$trending_days)
+
+```
+
+
+Now we will go ahead and perform univariate and bi-variate analysis for various variables.
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+cols = c("trending_days","views","likes","dislikes","comment_count")
+ggpairs(first_video_df,columns = cols,upper = list(continuous = wrap("cor", size =6)))
+```
+
+Since the data is heavily right skewed, we will take a log transformation. Lets have a look at the data after transformation.
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+cols = c("log.trending_days","log.views","log.likes","log.dislikes","log.comment_count")
+ggpairs(first_video_df,columns = cols,upper = list(continuous = wrap("cor", size =6)))
+```
+
+The distribution of data is improved after taking the log transformation except for trending days that still has ripple.
+Going forward, we will be using our log transformed data for analysis.
+
+###Cross-Validation
+We performed cross-validation for fitting and testing our model. We split the data into 80-20% train-test set.
+```{r message=FALSE,echo=FALSE,warning=FALSE} 
+library(caTools)
+set.seed(123)
+split = sample.split(first_video_df$views,SplitRatio = 0.8)
+training_set = subset(first_video_df,split == TRUE)
+test_set = subset(first_video_df,split == FALSE)
+```
+
+
+As the data is ready for exploratory data analysis, we will go ahead and look at the relationship between other variables. We see that comment count has comparatively high collinearity with other variables. Hence we will not include it into our model.
+
+Firstly lets look at the relationship between log likes and log number of views.
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15,fig.height=6}
+g1 =ggplot(training_set, aes(x = log.likes,y = log.views,group= country)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = country))+ ggtitle("Likes vs Views per Country")+theme(title=element_text(size=10))
+
+g2 = ggplot(training_set, aes(x = log.likes,y = log.views,group= categories)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = categories))+ ggtitle("Likes vs Views per Category")+theme(title=element_text(size=10)) 
+
+grid.arrange(g1,g2,ncol=2)
+
+```
+
+We can see that as the likes increase, the views tend to increase. In the first graph, until a certain period, Canada has the highest number of views compared to other countries. We can say there is an interaction between countries and likes. In the next graph, all the lines for various categories are almost overlapping. The categories do not look to have impact on the number of views a video might gain. 
+
+
+Similarly we will also look at the graph for log dislikes and number of views.
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15,fig.height=6}
+g1 = ggplot(training_set, aes(x = log.dislikes,y = log.views,group = country)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = country)) +ylim(1,8) + xlim(0,2) +
+  ggtitle("Dislikes vs Views per Country")+theme(title=element_text(size=10))
+
+g2 = ggplot(training_set, aes(x = log.dislikes,y = log.views,group = categories)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = categories)) +ylim(1,8) + xlim(0,2) +
+  ggtitle("Dislikes vs Views per Category")+theme(title=element_text(size=10))
+
+grid.arrange(g1,g2,ncol=2)
+```
+
+In the case of dislikes, we observe that similar to likes, as dislikes increases, the number of views tend to increase. Great Britain looks to have higher impact of dislikes on the potential number of views than other countries. The entertainment category gets high potentially high number of views. There is definately an interaction between dislikes and views. For categories, there is a little interactions going on. However, in order to keep our model simple, we will not consider this interaction in our model.
+
+We will look now at the relationship of trending days vs likes to see if it affects the popularity of videos.
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15,fig.height=6}
+#g1 = ggplot(training_set, aes(x = log.comment_count,y = log.views,group= categories)) + geom_point(alpha = 0.1)+  geom_smooth(method = 'lm',aes(color = categories))+ ggtitle("Likes vs Views per Category")+theme(title=element_text(size=10))
+
+#g2 = ggplot(training_set, aes(x = log.comment_count,y = log.views,group= categories)) + geom_point(alpha = 0.1)+  geom_smooth(method = 'lm',aes(color = categories))+ ggtitle("Likes vs Views per Category")+theme(title=element_text(size=10))
+#grid.arrange(g1,g2,ncol=2)
+
+
+g1 = ggplot(training_set, aes(x = log.trending_days,y = log.views,group = country)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = country)) +ylim(1,8) + xlim(0,2) +
+  ggtitle("Trending days vs Views per Country")+theme(title=element_text(size=10))
+
+
+g2 = ggplot(training_set, aes(x = log.trending_days,y = log.views)) + geom_point(alpha = 0.1) +
+  geom_smooth(method = 'lm',aes(color = categories))+ylim(1,8) + xlim(0,2) +
+  ggtitle("Trending days vs Views per Category")+theme(title=element_text(size=10))
+grid.arrange(g1,g2,ncol=2)
+```
+We observe the similar behaviour in trending days like we saw previously. Country and category has an effect and looks to have an interaction. We will retain these interactions in our model. 
+
+
+##Fitting a linear model
+
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15}
+my.model = lm(log.views~log.likes+log.dislikes +log.trending_days+ country+ 
+                log.likes:country+log.dislikes:country+log.trending_days:country+log.trending_days:categories,training_set)
+summary(my.model)
+
+```
+
+Looking at the coefficients, we see that dislikes plays more important role on popularity compared to likes. For every unit increase of dislikes(keeping other predictors constant), the views tend to increase by 0.50 times.
+As seen earlier, Canada gets highest number of potential views. So typically, if you belong to united states, your video will probably gain 0.46 times less views than it would have gained if it was in Canada. 
+
+We see that our model fits well on our data. Also the residual error & r-squared values look pretty good. Lets fit the model on the test data and draw graphs. 
+
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+my.predictions = predict(my.model,test_set)
+predict.df = data.frame(test_set,my.predictions)
+
+var(predict.df$my.predictions)/var(predict.df$log.views)
+
+ggplot(predict.df, aes(x = log.likes,y = my.predictions,group = country)) + geom_point(alpha = 0.2) +
+  geom_smooth(method = 'lm',aes(color = country))+facet_wrap(~cut_number(log.dislikes,n = 3,c("Low Dislikes","Medium Dislikes","High Dislikes")) ) + ggtitle("Predicted Log views vs Likes & Dislikes") +
+  theme(title=element_text(size=10)) + ylab('Predicted Log Views')
+
+```
+
+###Observations
+
+As discussed, as the number of likes increases, the potential views tend to increase. Keeping the likes constant, if a particular video gets higher number of dislikes, it gets more popular by ~10%. Looking at the countries, for less number of likes, videos in US, Canada, Great Britain get more views. However if the likes are 10k+, the videos in US and Greast britain trend more. One of the logical explanation behind Canada, US and GB getting more number of views could be that all of them are English speaking countries. Our model explain ~83% of variance.
+
+###Further Analysis
+
+Now we will look at other aspects in our data sets that could give us little more insights about popularity of videos.
+
+Lets check if a particular day of week gets higher number of views than other days for various categories.
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15,fig.height=5}
+
+ggplot(first_video_df, aes(x = weekdays(trending_date),y = views,color = categories)) + geom_point(alpha = 0.3) +
+  facet_wrap(~categories)+ ggtitle("Likes vs Views per Category")+theme(title=element_text(size=10)) +ylim(0,5000000) +xlab('Day of Week')
+```
+We can observe that the entertainment related videos stay trending on all days. Knowledge & current affairs related videos look to have low views on weekends(may be people want to just relax!). However Lifestyle videos go trending during weekends.
+
+Now we will go aheadd and look how long videos mostly stay trending in various countries.
+
+```{r message=FALSE,echo=FALSE,warning=FALSE,fig.width=15,fig.height=5}
+ggplot(videos_data,aes(trending_days,fill = categories))+geom_histogram()+facet_wrap(~country) + xlim(0,500) + ylim(0,5000) +ggtitle("Histogram for how long a videos stays trending in different countries")
+
+```
+
+We can see that in CA,DE and France, most of the videos stay trending for a shorter durations of time (1-5 days). However in GB and US, most of the videos stay trending for a longer period of time.
+
+##Future Work
+
+Apart from numerical predictors, other factors that are significant in predicting popularity of video are video descriptions, titles and channels. We can perform text mining to perform such natural language processing. This can give us deeper insights of what words and sentences provoke the viewers to watch the videos. For now, This remains the future scope of our project.
+
+
+
+
+
+
+
+
+##
