@@ -1,0 +1,421 @@
+---
+title: "Mini Project 2"
+author: "Apurva Gupta, Shailendra Patil, Surbhi Paithankar"
+date: "March 9, 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 0: Pre-processing Data
+
+Starting with the pre-processing,we created a subset of respondents who responded to the post election survey and who voted for Barack Obama in 2012.We also created a binary variable that indicates whether the respondent voted for Trump or not.(1 indicates that respondent voted for Trump)
+
+```{r message=FALSE,echo=FALSE,warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+```
+
+```{r message=FALSE,echo=FALSE}
+load('CCES16_Common_OUTPUT_Feb2018_VV.RData')
+respondants = subset(x,tookpost == 'Yes')
+respondants = subset(respondants,CC16_326=='Barack Obama')
+respondants['trump'] = ifelse(respondants$CC16_410a=='Donald Trump (Republican)',1,0)
+respondants$trump[is.na(respondants$trump)] = 0
+
+```
+
+
+We will need to measure respondent's attitude towards immigration.
+For this,we created a new variable which counts the number of positive responses towards immigrants across the four variables.
+
+```{r message=FALSE,echo=FALSE}
+respondants['count'] = 0
+respondants$count = ifelse(respondants$CC16_331_1=='Yes',respondants$count+1,respondants$count)
+respondants$count = ifelse(respondants$CC16_331_2=='No',respondants$count+1,respondants$count)
+respondants$count = ifelse(respondants$CC16_331_3=='Yes',respondants$count+1,respondants$count)
+respondants$count = ifelse(respondants$CC16_331_7=='No',respondants$count+1,respondants$count)
+r1 =data.frame(respondants$count,respondants$CC16_331_1,respondants$CC16_331_2,respondants$CC16_331_3,respondants$CC16_331_7)
+```
+
+Some of the racial categories have small amount of data. So, we recoded this variable to have four levels:"White","Black","Hispanic","Other".
+
+```{r message=FALSE,echo=FALSE}
+ typeof(respondants$race)
+respondants$race=recode(respondants$race,
+                        `Asian`="Other",`Middle Eastern` = "Other",
+                        `Native American` = "Other",`Mixed`="Other",`Black` = "Black",
+                        `Hispanic` = "Hispanic",`White`= "White")
+respondants$race=factor(respondants$race,ordered = FALSE)
+ 
+```
+
+
+Finally we converted the ordinal features:Party and education to numerical values.
+
+```{r message=FALSE,echo=FALSE}
+respondants['race_numeric'] = as.numeric(respondants$race)
+respondants['educ_numeric'] = as.numeric(respondants$educ)
+respondants$pid7[is.na(respondants$pid7)] = 'Not sure'
+respondants['pid7_numeric'] = as.numeric(respondants$pid7)
+respondants['gender'] = factor(respondants$gender,ordered = FALSE)
+respondants['gender_numeric'] = as.numeric(respondants$gender)
+```
+
+```{r }
+nrow(respondants)
+sum(respondants$trump)
+```
+After pre-processing, we obtained data consisting of 23,395 individuals who voted for Obama in 2012. Out of these, 2121 said that they voted for Trump in 2016.
+
+##Question 1:Weighted proportion of Obama voters for different demographic groups that switched to Trump 
+
+Going ahead, We will find the weighted proportion for people belonging to different races who switched to trump in the 2016 elections. Furthermore, we calculate the weighted proportions for people of various educational levels in the same way.
+```{r message=FALSE,echo=FALSE}
+respondants.trump = subset(respondants,trump==1)
+denom.race = aggregate(respondants$commonweight_vv_post,FUN = sum,by = list(respondants$race))
+numer.race = aggregate(respondants.trump$commonweight_vv_post,FUN = sum,by = list(respondants.trump$race))
+df.race = merge(numer.race,denom.race,by = 'Group.1')
+df.race['proportion'] = df.race$x.x/df.race$x.y
+race.proportion = data.frame(Race = df.race$Group.1,Proportion = df.race$proportion)
+race_proportion = data.frame(Race = df.race$Group.1,Proportion = round(df.race$proportion,3))
+
+denom.educ = aggregate(respondants$commonweight_vv_post,FUN = sum,by = list(respondants$educ))
+numer.educ = aggregate(respondants.trump$commonweight_vv_post,FUN = sum,
+                       by = list(respondants.trump$educ))
+df.educ = merge(numer.educ,denom.educ,by = 'Group.1')
+df.educ['proportion'] = df.educ$x.x/df.educ$x.y
+educ.proportion = data.frame(Education = df.educ$Group.1,Proportion = df.educ$proportion)
+educ_proportion = data.frame(Education = df.educ$Group.1,Proportion = round(df.educ$proportion,3))
+
+denom.gender = aggregate(respondants$commonweight_vv_post,FUN = sum,by = list(respondants$gender))
+numer.gender = aggregate(respondants.trump$commonweight_vv_post,FUN = sum,
+                       by = list(respondants.trump$gender))
+df.gender = merge(numer.gender,denom.gender,by = 'Group.1')
+df.gender['proportion'] = df.gender$x.x/df.gender$x.y
+gender.proportion = data.frame(Gender = df.gender$Group.1,Proportion = df.gender$proportion)
+
+gender_proportion = data.frame(Gender = df.gender$Group.1,Proportion = round(df.gender$proportion,3))
+
+denom.pid = aggregate(respondants$commonweight_vv_post,FUN = sum,by = list(respondants$pid7))
+numer.pid = aggregate(respondants.trump$commonweight_vv_post,FUN = sum,
+                       by = list(respondants.trump$pid7))
+df.pid = merge(numer.pid,denom.pid,by = 'Group.1')
+df.pid['proportion'] = df.pid$x.x/df.pid$x.y
+pid.proportion = data.frame(Party = df.pid$Group.1,Proportion = df.pid$proportion)
+pid_proportion = data.frame(Party = df.pid$Group.1,Proportion = round(df.pid$proportion,3))
+```
+
+Lets check the table with the weighted proportion of Obama voters for each demographic group.
+```{r}
+educ_proportion 
+race_proportion
+gender_proportion
+pid_proportion
+```
+
+Now we will go ahead and see how the attitude towards immigration changed the tendency to switch from Obama to Trump. To do this, we calculated the weighted proportion for each immigration attitude. 
+Lets look at the graph between these proportions against various immigration attitude now.
+
+```{r message=FALSE,echo=FALSE,fig.width=6,fig.height=2}
+respondants['immigration'] = factor(respondants$count)
+respondants.trump = subset(respondants,trump==1)
+denom.imm = aggregate(respondants$commonweight_vv_post,FUN = sum,by = list(respondants$immigration))
+numer.imm = aggregate(respondants.trump$commonweight_vv_post,FUN = sum,
+                       by = list(respondants.trump$immigration))
+df.imm = merge(numer.imm,denom.imm,by = 'Group.1')
+df.imm['proportion'] = df.imm$x.x/df.imm$x.y
+imm.proportion = data.frame(immigration = df.imm$Group.1,Proportion = df.imm$proportion)
+ggplot(imm.proportion,aes(x = immigration,y = Proportion ,group = 5)) +  geom_line() + ggtitle('Proportion of people switching to Trump Vs Immigration Attitude')
+#ggplot(race.proportion,aes(x = Race,y = Proportion ,group = 5)) +  geom_line()
+#ggplot(educ.proportion,aes(x = Education,y = Proportion ,group = 5)) +  geom_line()
+```
+
+Lets look in quantitative terms as well.
+```{r message=FALSE,echo=FALSE}
+t1=aggregate(trump~count,mean,data = respondants)
+t1 = data.frame(count = t1$count, trump = round(t1$trump,3))
+t1
+```
+We observe that as the attitude towards immigration tends to be more positive(closer to 4), the respondents' tendency of switching to Trump in 2016 decreases. This tells us that about ~38% of the people, who were strongly against immigrants switched to Trump in 2016, whereas the strong supporters of immigrants did not switch.  
+
+
+##Question 2:Effect of immigration attitude on various demographic categories.
+
+###Immigration attitude vs Switching probability for different Races
+We will fit a logistic regression using immigration attitude and race.We first fit an additive model with no interaction.
+```{r message=FALSE,echo=FALSE}
+logit.trump.add = glm(trump~count + race,family = "binomial", data = respondants)
+#summary(logit.trump.add)
+
+predict.df = expand.grid(count = 0:4, race = c('White','Black','Hispanic','Other'))
+pred = predict(logit.trump.add, type = "response", newdata = predict.df)
+pred.df = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'no')
+```
+
+Now we will model with interaction between immigration attitude and Race. 
+```{r message=FALSE,echo=FALSE}
+logit.trump.inter = glm(trump~count * race,family = "binomial", data = respondants)
+#summary(logit.trump.inter)
+```
+
+
+```{r message=FALSE,echo=FALSE}
+predict.df = expand.grid(count = 0:4, race = c('White','Black','Hispanic','Other'))
+pred = predict(logit.trump.inter, type = "response", newdata = predict.df)
+pred.df.inter = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'yes')
+
+df = rbind(pred.df,pred.df.inter)
+
+```
+
+We visualize the fit by drawing curves representing different values of the predictors. Lets display the switching probability as a function of immigration attitude with respect to race. Plotting the graphs using both the models with and without interaction.
+```{r message=FALSE,echo=FALSE}
+g1=ggplot(df, aes(x = count, y = switch.prob, color = interaction)) +
+  geom_line() + xlab("Attitude towards immigration") + ylab("Probability of switching") +
+  labs(color = "With Interaction?") + facet_wrap(~race)+ ggtitle('Probability of switching to Trump vs Immigration attitude for different Races')
+```
+
+```{r message=FALSE,echo=FALSE}
+g1
+```
+
+Looking at the graphs we observe that there is an interaction between race and the immigration attitude. The slopes of the curves for hispanic and blacks show a shift of 5% which is significant.
+
+###Immigration attitude vs Switching probability for different educational levels.
+We will fit a logistic regression using immigration attitude and education.We first fit an additive model with no interaction.
+
+```{r message=FALSE,echo=FALSE}
+logit.trump.educ = glm(trump~count + educ,family = "binomial", data = respondants)
+#summary(logit.trump.educ)
+
+predict.df = expand.grid(count = 0:4, educ = c('No HS', 'High school graduate','Some college' , '2-year' , '4-year','Post-grad'))
+pred = predict(logit.trump.educ, type = "response", newdata = predict.df)
+pred.df = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'no')
+
+```
+Additionally,we will model with interaction between immigration attitude and education. 
+```{r message=FALSE,echo=FALSE}
+logit.trump.educin = glm(trump~count * educ,family = "binomial", data = respondants)
+#summary(logit.trump.educin)
+
+predict.df = expand.grid(count = 0:4, educ = c('No HS', 'High school graduate','Some college' , '2-year' , '4-year','Post-grad'))
+pred = predict(logit.trump.educin, type = "response", newdata = predict.df)
+pred.df.inter = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'yes')
+
+df = rbind(pred.df,pred.df.inter)
+
+```
+
+Lets visualize by plotting the graphs using both the models with and without interaction.
+```{r message=FALSE,echo=FALSE}
+g2=ggplot(df, aes(x = count, y = switch.prob, color = interaction)) +
+  geom_line() + xlab("Attitude towards immigration") + ylab("Probability of switching") +
+  labs(color = "With Interaction?") + facet_wrap(~educ) + ggtitle('Probability of switching to Trump vs Immigration attitude for different educations')
+```
+```{r message=FALSE,echo=FALSE}
+g2
+```
+In the above graphs, we can see that there is a difference of almost 5-10% with & without interaction. Hence we can call the interaction between education and immigration attitude to be significant.
+
+###Immigration attitude vs Switching probability for different Genders.
+We will fit a logistic regression using immigration attitude and genders.We first fit an additive model with no interaction.
+
+```{r message=FALSE,echo=FALSE}
+logit.trump.gender = glm(trump~count + gender,family = "binomial", data = respondants)
+#summary(logit.trump.educ)
+
+predict.df = expand.grid(count = 0:4, gender = c('Female','Male'))
+pred = predict(logit.trump.gender, type = "response", newdata = predict.df)
+pred.df = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'no')
+
+```
+Additionally,we will model with interaction between immigration attitude and gender. 
+```{r message=FALSE,echo=FALSE}
+logit.trump.genderin = glm(trump~count * gender,family = "binomial", data = respondants)
+#summary(logit.trump.educin)
+
+predict.df = expand.grid(count = 0:4, gender = c('Female','Male'))
+pred = predict(logit.trump.genderin, type = "response", newdata = predict.df)
+pred.df.inter = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'yes')
+
+df = rbind(pred.df,pred.df.inter)
+
+```
+
+Lets visualize by plotting the graphs using both the models with and without interaction.
+```{r message=FALSE,echo=FALSE}
+g3=ggplot(df, aes(x = count, y = switch.prob, color = interaction)) +
+  geom_line() + xlab("Attitude towards immigration") + ylab("Probability of switching") +
+  labs(color = "With Interaction?") + facet_wrap(~gender) + ggtitle('Probability of switching to Trump vs Immigration attitude for different genders')
+
+```
+
+```{r message=FALSE,echo=FALSE,fig.width=6,fig.height=2}
+g3
+```
+
+Looking at the graphs we observe that the graphs with/without interaction are almost similar.Hence we can say that, there is no interaction between gender and the immigration attitude.
+
+
+###Immigration attitude vs Switching probability for different Parties.
+We will fit a logistic regression using immigration attitude and political parties.We first fit an additive model with no interaction.
+
+```{r message=FALSE,echo=FALSE}
+logit.trump.pid = glm(trump~count + pid7,family = "binomial", data = respondants)
+#summary(logit.trump.educ)
+
+predict.df = expand.grid(count = 0:4, pid7 = c('Independent', 'Lean Democrat','Lean Republican','Not sure','Not very strong Democrat',			
+'Not very strong Republican',			
+'Strong Democrat','Strong Republican'))
+pred = predict(logit.trump.pid, type = "response", newdata = predict.df)
+pred.df = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'no')
+
+```
+
+Additionally,we will model with interaction between immigration attitude and political parties. 
+```{r message=FALSE,echo=FALSE}
+logit.trump.pid = glm(trump~count * pid7,family = "binomial", data = respondants)
+#summary(logit.trump.educin)
+
+predict.df = expand.grid(count = 0:4, pid7 = c('Independent', 'Lean Democrat','Lean Republican','Not sure','Not very strong Democrat',			
+'Not very strong Republican',			
+'Strong Democrat','Strong Republican'))
+pred = predict(logit.trump.pid, type = "response", newdata = predict.df)
+pred.df.inter = data.frame(predict.df, switch.prob = as.vector(pred),interaction = 'yes')
+
+df = rbind(pred.df,pred.df.inter)
+
+```
+
+Lets visualize by plotting the graphs using both the models with and without interaction.
+```{r message=FALSE,echo=FALSE}
+g4=ggplot(df, aes(x = count, y = switch.prob, color = interaction)) +
+  geom_line() + xlab("Attitude towards immigration") + ylab("Probability of switching") +
+  labs(color = "With Interaction?") + facet_wrap(~pid7) + ggtitle('Probability of switching to Trump vs Immigration attitude')
+
+```
+```{r message=FALSE,echo=FALSE}
+g4
+```
+
+The curves for predictions using models with and without interaction are different for most of the political parties. Hence we will keep this interaction in our model.
+
+##Question 3:Effect of immigration attitude on various demographic categories using lots of predictors.
+
+We have following demographic predictors:
+1. Race
+2. Education 
+3. Gender
+4. Party ID
+5. Immigration attitude
+
+Firstly lets fit a logistic regression model without considering the immigration attitude. We will begin with fitting a model with interaction between education and party ID.
+```{r message=FALSE,echo=FALSE}
+summary(glm(trump~educ_numeric*pid7_numeric+race+gender,family = "binomial", data = respondants))
+switch.model = glm(trump~educ_numeric*pid7_numeric+race+gender,family = "binomial", data = respondants)
+deviance(switch.model)
+switch.model.df = respondants
+switch.model.df$.fitted =fitted.values(switch.model)
+switch.model.df$.resid =residuals(switch.model, type = "response")
+```
+
+Looking at the coefficients, a positive value for party Id indicates that person who is more inclined towards Republicans are more likely to switch. Furthermore, as we go from whites to blacks, the chances to switch decreases. Finally females are less likely to switch compared to males.
+We have a residual deviance of 11500. Lets incorporate some more interactions in our model, just to make it better.
+Additionally, the interactions between race & party, race & education looks to be sensible. Lets fit a more complex model and check the deviance. 
+```{r message=FALSE,echo=FALSE,fig.width=6,fig.height=2}
+
+switch.model = glm(trump~race:educ_numeric+
+                     race:pid7_numeric+
+                     educ_numeric:pid7_numeric+
+                     educ_numeric+pid7_numeric+race+gender,family = "binomial", data = respondants)
+deviance(switch.model)
+switch.model.df = respondants
+switch.model.df$.fitted =fitted.values(switch.model)
+switch.model.df$.resid =residuals(switch.model, type = "response")
+
+ggplot(switch.model.df,aes(x = .fitted, y = .resid))+ geom_point()+ geom_smooth(method = "loess",method.args =list(degree = 1))+ xlab("Fitted values")+ ylab("Residuals")
+
+```
+
+The deviance has reduced but not significantly. The plot shows a bend at the tails. However the model looks to do a fine job. Going ahead, we will plot our predictions using this model. Lets fix race: white.
+
+```{r message=FALSE,echo=FALSE}
+
+switch.grid =expand.grid(educ_numeric = c(1,2,3,4,5,6), pid7_numeric =seq(1, 8, 1),race = "White", gender = c("Female","Male"))
+pred = predict(switch.model, newdata = switch.grid, type = 'response')
+pred.grid = data.frame(switch.grid, switch.prob =as.vector(pred))
+
+ggplot(pred.grid,aes(x = educ_numeric, y = switch.prob, group = pid7_numeric, color =factor(pid7_numeric)))+geom_line()+ xlab("Education level")+ ylab("Probability of switching")+labs(color = "Party")+ scale_color_manual(values =c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), labels =c("Strong Democrat","Not very strong Democrat","Lean Democrat","Independent","Lean Republican","Not very strong Republican","Strong Republican","Not sure")) + facet_wrap(~gender)+ ggtitle("Switching probability Vs Education level")
+```
+
+In the plot above we observe that white males are 5% more likely to switch from Obama to Trump. Moreover, as the education of a person increases, he is less likely to switch. We also notice that the political preference of a person also contributes to shifting of votes. Republicans are more likely to switch compared to democrats. The probability of switching increases by ~10% as the proclivity changes from democrats to republicans.
+
+We will now look for at all the races and see if we can see similar behaviors in them as well.
+```{r message=FALSE,echo=FALSE}
+
+switch.grid =expand.grid(educ_numeric = c(1,2,3,4,5,6), pid7_numeric =seq(1, 8, 1),race = c("White","Black","Hispanic","Other"), gender = c("Female","Male"))
+pred = predict(switch.model, newdata = switch.grid, type = 'response')
+pred.grid = data.frame(switch.grid, switch.prob =as.vector(pred))
+
+ggplot(pred.grid,aes(x = educ_numeric, y = switch.prob, group = pid7_numeric, color =factor(pid7_numeric)))+geom_line()+ xlab("Education level")+ ylab("Probability of switching")+labs(color = "Party")+ scale_color_manual(values =c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), labels =c("Strong Democrat","Not very strong Democrat","Lean Democrat","Independent","Lean Republican","Not very strong Republican","Strong Republican","Not sure")) + facet_wrap(~gender+race, ncol = 4)+ ggtitle("Switching probability Vs Education level")
+
+```
+
+For Blacks, the effect of education level is low. The lines are almost horizontal & parallel.In case of Hispanics and Other races as the education level increases the probability of switching increases as opposed to the behavior observed in "Whites". However the effect of gender looks to be similar in all the races.
+
+Now we will go ahead and fit another logistic model with immigration attitude as a predictor as well. From the question 2, we observed a significant interaction going on between immigration attitude: education,immigration attitude:race and immigration attitude:party. Therefore, we will keep them in our model along with the interactions in the previous model. Lets look at the summary of the new model.
+
+```{r message=FALSE,echo=FALSE}
+switch.model = glm(trump~educ_numeric:count+
+                     pid7_numeric:count+
+                     race:educ_numeric+
+                     race:pid7_numeric+
+                     educ_numeric:pid7_numeric+
+                     race:count+
+                     race+pid7_numeric+gender+educ_numeric+count,family = "binomial", data = respondants)
+summary(switch.model)
+
+```
+
+We obtain a residual deviance of 9980 which is a significant reduction when compared to the previous model. This tells us that the immigration attitudes plays a major role in predicting the probability of switching votes. 
+
+Lets try to visualize this graphically. To do this, we will fix the race as White belonging to independent party for various education levels.
+
+```{r message=FALSE,echo=FALSE}
+switch.grid =expand.grid(educ_numeric = c(1,2,3,4,5,6,7,8), pid7_numeric = 4,race = "White", count = seq(0,4,1),gender = c("Male","Female"))
+
+pred = predict(switch.model, newdata = switch.grid, type = 'response')
+pred.grid = data.frame(switch.grid, switch.prob =as.vector(pred))
+
+ggplot(pred.grid,aes(x = count, y = switch.prob, group = educ_numeric, color =factor(educ_numeric)))+geom_line()+ xlab("Immigration attitude")+ ylab("Probability of switching")+labs(color = "Party")+ scale_color_manual(values =c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), labels =c("No HS","High school graduate", "Some college","2-year","4-year" ,"Post-grad","Skipped","Not Asked")) + facet_wrap(~gender, ncol = 6)+ ggtitle("Switching probability Vs Immigration attitude")
+
+```
+
+We can clearly see that as the immigration attitude gets more positive, the probability of switching decreases. For every unit change of immigration attitude, the switching probability decreases by roughly 20%. 
+
+Lets again make the predictions. This time we will consider the males having median level of education. We will take all the races into consideration.
+
+```{r message=FALSE,echo=FALSE}
+switch.grid =expand.grid(educ_numeric = median(respondants$educ_numeric), pid7_numeric = seq(1, 8, 1),race = c("White","Black","Hispanic","Other"), count = seq(0,4,1),gender = c("Male"))
+
+pred = predict(switch.model, newdata = switch.grid, type = 'response')
+pred.grid = data.frame(switch.grid, switch.prob =as.vector(pred))
+
+ggplot(pred.grid,aes(x = count, y = switch.prob, group = pid7_numeric, color =factor(pid7_numeric)))+geom_line()+ xlab("Immigration attitude")+ ylab("Probability of switching")+labs(color = "Party")+ scale_color_manual(values =c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), labels =c("Strong Democrat","Not very strong Democrat","Lean Democrat","Independent","Lean Republican","Not very strong Republican","Strong Republican","Not sure")) + facet_wrap(~race, ncol = 2) + ggtitle("Switching probability Vs Immigration attitude")
+
+```
+
+The above plots also indicate that for all the races, the immigration attitude affects the switching probability for all the political parties.
+
+## Conclusion
+
+The fitted logistic models show that the immigration attitude makes a substantive difference to the probability of switching from Obama to trump. We can say that republicans were more likely to switch compared to democrats.With increase in education level, the switching probability decreases. Furthermore, females within same demographic group were 5% less probable to change their votes. 
+
+Finally, keeping all the demographic variables constant, had the immigration attitude was insignificant, we would expect the curves to be horizontal. However we see a systematic pattern in the curves. Hence we can conclude that immigration attitude played an important role for shifting their votes from Obama to Trump.
+
