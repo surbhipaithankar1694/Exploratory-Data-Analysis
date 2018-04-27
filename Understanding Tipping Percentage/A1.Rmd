@@ -1,0 +1,127 @@
+---
+title: "Assignment1"
+author: "Surbhi Paithankar, Apurva Gupta"
+date: "January 15, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Data Into R
+
+```{r}
+data = read.table("tips.txt",header = TRUE)
+head(data)
+```
+
+#Question 1
+
+Calculating tip percentage
+
+```{r}
+tips_percent = (data$tip/data$total_bill)*100
+data<-cbind(data,tips_percent)
+head(data)
+```
+
+Importing ggplot Library and creating an object
+
+```{r}
+library(ggplot2)
+my_ggplot = ggplot(data = data,aes(x = tips_percent))
+```
+
+
+#Center,spread and shape of Distribution
+
+Creating Density plot
+
+```{r}
+my_ggplot + geom_density(adjust=1) + xlab("Tips Percentage") + 
+ggtitle("Distribution Of Tips:Density Plot")
+```
+
+##Observations
+
+The mean of distribution is between 15 to 18. The distribution is right skewed and ranges from 2 to 70 appromximately.
+
+We can verify this using summary statistics.
+
+```{r}
+summary(data$tips_percent)
+```
+
+#Performing Transformations
+
+Since, the density Plot is right skewed. Therefore, we can perform log transformation to check if we can obtain a better symmetrical distribution.
+
+```{r}
+my_log_ggplot = ggplot(data = data,aes(x=log(tips_percent)))
+my_log_ggplot + geom_density(adjust=1) + xlab("Log of Tips Percentage") + ggtitle("Distribution Of Tips(Log values):Density Plot")
+```
+
+##Observations
+
+Taking log transformations give us a better symmetrical distribution.
+
+#Checking Normality of Data
+
+QQPlot of data
+
+```{r}
+ggplot(data,aes(sample=tips_percent)) + stat_qq() + ggtitle("QQPLOT for Tips")
+```
+
+#Checking Normality of Log Data
+
+QQPlot of Log data
+
+```{r}
+ggplot(data,aes(sample=log(tips_percent))) + stat_qq() + ggtitle("QQPLOT for Tips")
+```
+
+##Observations
+QQPlot of the transformed data has a better linearity than the original data.
+
+#Question 2
+
+#Distribution of Percentage tipped for each Party Size.
+
+```{r}
+my_ggplot + geom_histogram(binwidth = 1) +
+  ggtitle ("Distribution of Tips percentage for each party size") + 
+  facet_wrap(facets = ~data$size,ncol = 2)
+ggplot(data,aes(sample=tips_percent))+
+  stat_qq()+ggtitle("QQPLOT of Tips percentage for each party size")+ 
+  facet_wrap(facets = ~data$size,ncol = 2)
+my_ggplot + geom_density(adjust = 1) +
+  ggtitle ("Distribution of Tips percentage for each party size") + 
+  facet_wrap(facets = ~data$size,ncol = 2)
+```
+
+##Observations
+
+From the density plot faceted graphs, we can observe that the distribution for 2,3 & 4 party sizes are similar.The density plots are right skewed with mean between 15-20. The QQplots also appear to be nearly straightish.
+However the distribution for other party sizes (1,5 and 6) are completely different than others. 
+From the histogram faceted graphs, we can observe that the sample sizes of 1,5 & 6 party sizes are very small. This might be a reason for the variations in the distributions.
+Therefore we cannot make a strong conclusion about the distributions of party sizes 1,5 & 6. We need more data for them.
+
+#Question 3
+
+Though our data is right skewed, but the data after transformation looks nearly symmetrical. Therefore  mean is a good measure of center for the percentage tipped distributions.
+```{r}
+size = data$size
+tips.mean = aggregate(tips_percent ~ size,FUN = mean,data = data)
+tips.mean$tips_percent
+ggplot(tips.mean,aes(x = tips.mean$size,y=tips.mean$tips_percent)) + 
+  geom_point() + xlab("Party Size") + ylab("Tip Percentage") + 
+  ggtitle("Percentage tipped vs Party size")
+```
+
+##Observations
+
+We can observe that there is a variation in central tendency for party sizes. As we have seen earlier, sample sizes for party sizes 1,5 & 6 are small. Hence this difference can be attributed as variation by chance. However the variations in party sizes 2,3,4 look to be real.
+
+
